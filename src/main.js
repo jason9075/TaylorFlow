@@ -651,46 +651,88 @@ canvas.addEventListener('wheel', e => {
 // ─── Modal ────────────────────────────────────────────────────────────────────
 const MODAL = {
   en: `
-    <h3>Taylor Series</h3>
-    <p>A Taylor series expands $f(x)$ around a center point $a$ as an infinite polynomial:</p>
-    <p>$$f(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$</p>
-    <p>The <strong>N-th order polynomial</strong> truncates this sum and approximates $f$:</p>
-    <p>$$P_N(x) = \\sum_{n=0}^{N} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$</p>
-    <p>The <strong>Lagrange remainder</strong> bounds the error:</p>
-    <p>$$|R_N(x)| \\leq \\frac{M_{N+1}}{(N+1)!}|x-a|^{N+1}, \\quad M_{N+1} = \\max_{\\xi}|f^{(N+1)}(\\xi)|$$</p>
-    <p><strong>Relative error</strong> compares the absolute error to the size of the true value:</p>
-    <p>$$\\text{rel. error} = \\frac{|f(x)-P_N(x)|}{|f(x)|} \\times 100\\%$$</p>
-    <p>It tells you whether the approximation is small relative to the function itself. When $f(x)$ is very close to $0$, this ratio becomes unstable, so the UI hides it as unavailable.</p>
-    <p>Each new term adds a correction proportional to $(x-a)^n$, capturing finer curvature.
-    As $N \\to \\infty$, the shaded error region shrinks to zero — for functions with infinite
-    radius of convergence like $e^x$, everywhere simultaneously.</p>
-    <pre><code class="language-js">// Core loop: evaluate P_N(x) via Horner's scheme
+    <section>
+      <h3>Core Idea</h3>
+      <p>A Taylor series expands $f(x)$ around a center point $a$ as an infinite polynomial:</p>
+      <p>$$f(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$</p>
+      <p>The orange point is the expansion center. Moving it changes the local approximation.</p>
+    </section>
+    <section>
+      <h3>What the App Draws</h3>
+      <p>The app shows the <strong>N-th order Taylor polynomial</strong>, which truncates the series after $N$:</p>
+      <p>$$P_N(x) = \\sum_{n=0}^{N} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$</p>
+      <ul>
+        <li>The dashed curve is the original function $f(x)$.</li>
+        <li>The bright curve is the approximation $P_N(x)$.</li>
+        <li>The shaded region highlights the gap between them.</li>
+      </ul>
+    </section>
+    <section>
+      <h3>Error Metrics</h3>
+      <p>The <strong>Lagrange remainder</strong> gives a standard upper bound on approximation error:</p>
+      <p>$$|R_N(x)| \\leq \\frac{M_{N+1}}{(N+1)!}|x-a|^{N+1}, \\quad M_{N+1} = \\max_{\\xi}|f^{(N+1)}(\\xi)|$$</p>
+      <p>Here, $R_N(x) = f(x) - P_N(x)$ is the part left over after truncating the Taylor series at order $N$.</p>
+      <p>It is not the polynomial itself; it is the <strong>remaining error term</strong>. The formula above tells you how large that leftover can be, using a bound on the next derivative.</p>
+      <p>The panel also reports <strong>relative error</strong>:</p>
+      <p>$$\\text{rel. error} = \\frac{|f(x)-P_N(x)|}{|f(x)|} \\times 100\\%$$</p>
+      <p>It measures how large the approximation error is compared with the true value itself. If $f(x)$ is extremely close to $0$, the ratio becomes unstable, so the UI hides it.</p>
+    </section>
+    <section>
+      <h3>How to Read the Result</h3>
+      <p>Adding more terms usually improves the fit near $a$, because each new power of $(x-a)$ captures finer local curvature.</p>
+      <p>For functions like $e^x$, the approximation converges broadly. For others, the quality depends more strongly on both the center $a$ and the evaluation point $x$.</p>
+    </section>
+    <section>
+      <h3>Implementation Note</h3>
+      <pre><code class="language-js">// Core loop: evaluate P_N(x) via Horner's scheme
 function evalPoly(coeffs, a, x) {
   let r = 0, xPow = 1;
   for (const c of coeffs) { r += c * xPow; xPow *= (x - a); }
   return r;
 }</code></pre>
+    </section>
   `,
   zhTW: `
-    <h3>泰勒級數</h3>
-    <p>泰勒級數將 $f(x)$ 在中心點 $a$ 附近展開為無窮多項式之和：</p>
-    <p>$$f(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$</p>
-    <p><strong>N 階泰勒多項式</strong>截取前 $N+1$ 項來近似 $f$：</p>
-    <p>$$P_N(x) = \\sum_{n=0}^{N} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$</p>
-    <p><strong>拉格朗日餘項</strong>給出誤差上界：</p>
-    <p>$$|R_N(x)| \\leq \\frac{M_{N+1}}{(N+1)!}|x-a|^{N+1}, \\quad M_{N+1} = \\max_{\\xi}|f^{(N+1)}(\\xi)|$$</p>
-    <p><strong>相對誤差</strong>是把絕對誤差除以真值大小後得到的比例：</p>
-    <p>$$\\text{rel. error} = \\frac{|f(x)-P_N(x)|}{|f(x)|} \\times 100\\%$$</p>
-    <p>它反映的是近似誤差相對於函數本身有多大。當 $f(x)$ 非常接近 $0$ 時，這個比例會變得不穩定，因此介面會把它顯示為不可用。</p>
-    <p>每新增一項，就加入一個正比於 $(x-a)^n$ 的修正量，能捕捉更高頻的曲率細節。
-    當 $N \\to \\infty$ 時，橘色陰影誤差帶收縮至零——對 $e^x$ 這類收斂半徑無窮的函數，
-    整條實數軸上都成立。</p>
-    <pre><code class="language-js">// 核心迴圈：用迭代方式求 P_N(x)
+    <section>
+      <h3>核心概念</h3>
+      <p>泰勒級數將 $f(x)$ 在中心點 $a$ 附近展開成無窮多項式：</p>
+      <p>$$f(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$</p>
+      <p>畫面上的橘點就是展開中心。你拖動它時，局部近似也會跟著改變。</p>
+    </section>
+    <section>
+      <h3>這個 App 在畫什麼</h3>
+      <p>畫面顯示的是 <strong>N 階泰勒多項式</strong>，也就是把級數截到第 $N$ 項：</p>
+      <p>$$P_N(x) = \\sum_{n=0}^{N} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$</p>
+      <ul>
+        <li>虛線曲線是原始函數 $f(x)$。</li>
+        <li>亮色曲線是近似多項式 $P_N(x)$。</li>
+        <li>橘色陰影區域表示兩者之間的落差。</li>
+      </ul>
+    </section>
+    <section>
+      <h3>誤差怎麼看</h3>
+      <p><strong>拉格朗日餘項</strong>提供了近似誤差的標準上界：</p>
+      <p>$$|R_N(x)| \\leq \\frac{M_{N+1}}{(N+1)!}|x-a|^{N+1}, \\quad M_{N+1} = \\max_{\\xi}|f^{(N+1)}(\\xi)|$$</p>
+      <p>其中 $R_N(x) = f(x) - P_N(x)$，表示把泰勒級數截到第 $N$ 階之後，還剩下多少沒有被多項式捕捉到。</p>
+      <p>它不是泰勒多項式本身，而是<strong>剩餘的誤差項</strong>。上面的公式不是直接算出誤差，而是用下一階導數的大小去估計這個誤差最多有多大。</p>
+      <p>右側面板還會顯示 <strong>相對誤差</strong>：</p>
+      <p>$$\\text{rel. error} = \\frac{|f(x)-P_N(x)|}{|f(x)|} \\times 100\\%$$</p>
+      <p>它表示誤差相對於真值本身有多大。當 $f(x)$ 非常接近 $0$ 時，比例會變得不穩定，所以介面會把它隱藏成不可用。</p>
+    </section>
+    <section>
+      <h3>如何解讀結果</h3>
+      <p>通常在 $a$ 附近，階數越高，近似會越好，因為每多一項就多捕捉一層局部曲率資訊。</p>
+      <p>像 $e^x$ 這類函數，收斂範圍很廣；其他函數則會更依賴展開中心 $a$ 與評估點 $x$ 的位置。</p>
+    </section>
+    <section>
+      <h3>程式實作</h3>
+      <pre><code class="language-js">// 核心迴圈：用迭代方式求 P_N(x)
 function evalPoly(coeffs, a, x) {
   let r = 0, xPow = 1;
   for (const c of coeffs) { r += c * xPow; xPow *= (x - a); }
   return r;
 }</code></pre>
+    </section>
   `,
 };
 
