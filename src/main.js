@@ -2,7 +2,9 @@
 const canvas      = document.getElementById('canvas');
 const ctx         = canvas.getContext('2d');
 const funcSelect  = document.getElementById('func-select');
+const copyFormulaBtn = document.getElementById('copy-formula');
 const formulaEl   = document.getElementById('formula-display');
+const formulaHoverEl = document.getElementById('formula-hover-content');
 const trueValEl   = document.getElementById('true-val');
 const approxValEl = document.getElementById('approx-val');
 const absErrEl    = document.getElementById('abs-err');
@@ -30,6 +32,7 @@ const state = {
   a: 0,
   xEval: 1.5,
   zoom: 1,
+  formulaLatex: '',
   view: { ...DEFAULT_VIEW },
   anim: { active: false, t: 1, startTime: 0, duration: 600 },
   drag: { active: false },
@@ -372,7 +375,7 @@ function termLatex(funcKey, a, n) {
   return { s: sign, l: `${cStr}\\,${xPart}` };
 }
 
-function buildFormulaLatex(funcKey, a, order) {
+function buildFormulaLatex(funcKey, a, order, { compact = true } = {}) {
   const terms = [];
   for (let n = 0; n <= order; n++) {
     const t = termLatex(funcKey, a, n);
@@ -381,7 +384,7 @@ function buildFormulaLatex(funcKey, a, order) {
   if (terms.length === 0) return `P_{${order}}(x) = 0`;
 
   const MAX = 5;
-  const show = terms.length > MAX + 1
+  const show = compact && terms.length > MAX + 1
     ? [...terms.slice(0, 3), null, terms[terms.length - 1]]
     : terms;
 
@@ -401,6 +404,34 @@ function buildFormulaLatex(funcKey, a, order) {
   return `P_{${order}}(x) = ${out}`;
 }
 
+function buildFormulaBlockLatex(funcKey, a, order) {
+  const terms = [];
+  for (let n = 0; n <= order; n++) {
+    const t = termLatex(funcKey, a, n);
+    if (t) terms.push({ ...t, n });
+  }
+  if (terms.length === 0) return `P_{${order}}(x) = 0`;
+
+  const lines = [];
+  const chunkSize = 4;
+  for (let i = 0; i < terms.length; i += chunkSize) {
+    const chunk = terms.slice(i, i + chunkSize);
+    let line = '';
+    for (let j = 0; j < chunk.length; j++) {
+      const { s, l, n } = chunk[j];
+      const display = n === order ? `{\\color{#D08770}{${l}}}` : l;
+      if (i === 0 && j === 0) {
+        line += s === -1 ? `- ${display}` : display;
+      } else {
+        line += s === -1 ? ` - ${display}` : ` + ${display}`;
+      }
+    }
+    lines.push(line);
+  }
+
+  return `\\begin{aligned}P_{${order}}(x) &= ${lines[0]}${lines.slice(1).map(line => `\\\\ &\\quad ${line}`).join('')}\\end{aligned}`;
+}
+
 // ─── UI updates ───────────────────────────────────────────────────────────────
 function updateOrderButtons() {
   document.querySelectorAll('.order-btn').forEach(btn => {
@@ -409,16 +440,42 @@ function updateOrderButtons() {
 }
 
 function updateFormula() {
-  const latex = buildFormulaLatex(state.funcKey, state.a, state.order);
+  const compactLatex = buildFormulaLatex(state.funcKey, state.a, state.order, { compact: true });
+  const fullLatex = buildFormulaBlockLatex(state.funcKey, state.a, state.order);
+  state.formulaLatex = fullLatex;
   if (window.katex) {
     try {
-      formulaEl.innerHTML = window.katex.renderToString(latex, {
+      formulaEl.innerHTML = window.katex.renderToString(compactLatex, {
         throwOnError: false, displayMode: true,
       });
-    } catch { formulaEl.textContent = latex; }
+      formulaHoverEl.innerHTML = window.katex.renderToString(fullLatex, {
+        throwOnError: false, displayMode: true,
+      });
+    } catch {
+      formulaEl.textContent = compactLatex;
+      formulaHoverEl.textContent = fullLatex;
+    }
   } else {
-    formulaEl.textContent = latex;
+    formulaEl.textContent = compactLatex;
+    formulaHoverEl.textContent = fullLatex;
   }
+}
+
+async function copyFormulaToClipboard() {
+  const originalTitle = copyFormulaBtn.title;
+  const originalAria = copyFormulaBtn.getAttribute('aria-label');
+  try {
+    await navigator.clipboard.writeText(state.formulaLatex);
+    copyFormulaBtn.title = 'Copied';
+    copyFormulaBtn.setAttribute('aria-label', 'Copied');
+  } catch {
+    copyFormulaBtn.title = 'Copy failed';
+    copyFormulaBtn.setAttribute('aria-label', 'Copy failed');
+  }
+  setTimeout(() => {
+    copyFormulaBtn.title = originalTitle;
+    copyFormulaBtn.setAttribute('aria-label', originalAria);
+  }, 1200);
 }
 
 function updateStats() {
@@ -524,6 +581,10 @@ snapXEvalBtn.addEventListener('click', () => {
   updateStats();
 });
 
+copyFormulaBtn.addEventListener('click', () => {
+  copyFormulaToClipboard();
+});
+
 zoomSlider.addEventListener('input', () => {
   const centerX = (state.view.left + state.view.right) / 2;
   const centerY = (state.view.top + state.view.bottom) / 2;
@@ -597,6 +658,9 @@ const MODAL = {
     <p>$$P_N(x) = \\sum_{n=0}^{N} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$</p>
     <p>The <strong>Lagrange remainder</strong> bounds the error:</p>
     <p>$$|R_N(x)| \\leq \\frac{M_{N+1}}{(N+1)!}|x-a|^{N+1}, \\quad M_{N+1} = \\max_{\\xi}|f^{(N+1)}(\\xi)|$$</p>
+    <p><strong>Relative error</strong> compares the absolute error to the size of the true value:</p>
+    <p>$$\\text{rel. error} = \\frac{|f(x)-P_N(x)|}{|f(x)|} \\times 100\\%$$</p>
+    <p>It tells you whether the approximation is small relative to the function itself. When $f(x)$ is very close to $0$, this ratio becomes unstable, so the UI hides it as unavailable.</p>
     <p>Each new term adds a correction proportional to $(x-a)^n$, capturing finer curvature.
     As $N \\to \\infty$, the shaded error region shrinks to zero — for functions with infinite
     radius of convergence like $e^x$, everywhere simultaneously.</p>
@@ -615,6 +679,9 @@ function evalPoly(coeffs, a, x) {
     <p>$$P_N(x) = \\sum_{n=0}^{N} \\frac{f^{(n)}(a)}{n!}(x-a)^n$$</p>
     <p><strong>拉格朗日餘項</strong>給出誤差上界：</p>
     <p>$$|R_N(x)| \\leq \\frac{M_{N+1}}{(N+1)!}|x-a|^{N+1}, \\quad M_{N+1} = \\max_{\\xi}|f^{(N+1)}(\\xi)|$$</p>
+    <p><strong>相對誤差</strong>是把絕對誤差除以真值大小後得到的比例：</p>
+    <p>$$\\text{rel. error} = \\frac{|f(x)-P_N(x)|}{|f(x)|} \\times 100\\%$$</p>
+    <p>它反映的是近似誤差相對於函數本身有多大。當 $f(x)$ 非常接近 $0$ 時，這個比例會變得不穩定，因此介面會把它顯示為不可用。</p>
     <p>每新增一項，就加入一個正比於 $(x-a)^n$ 的修正量，能捕捉更高頻的曲率細節。
     當 $N \\to \\infty$ 時，橘色陰影誤差帶收縮至零——對 $e^x$ 這類收斂半徑無窮的函數，
     整條實數軸上都成立。</p>
