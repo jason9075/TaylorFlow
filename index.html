@@ -366,6 +366,38 @@
 
     .stat-error { color: var(--n11) !important; }
 
+    .insight-note {
+      margin-top: 0.7rem;
+      padding-top: 0.65rem;
+      border-top: 1px solid var(--n2);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      color: var(--n5);
+    }
+
+    .insight-note strong {
+      color: var(--n9);
+    }
+
+    .insight-note p {
+      margin: 0.35rem 0 0;
+    }
+
+    .insight-note ul {
+      margin: 0.4rem 0 0;
+      padding-left: 1rem;
+    }
+
+    .insight-note li + li {
+      margin-top: 0.25rem;
+    }
+
+    .insight-note .katex-display {
+      margin: 0.35rem 0 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
     /* ── Modal ── */
     #math-modal[hidden] { display: none; }
 
@@ -569,7 +601,9 @@
           <tr><td>P<sub>N</sub>(x)</td><td id="approx-val">—</td></tr>
           <tr><td>|error|</td><td id="abs-err" class="stat-error">—</td></tr>
           <tr><td>rel. error</td><td id="rel-err" class="stat-error">—</td></tr>
+          <tr><td>Lagrange bound</td><td id="lagrange-bound" class="stat-error">—</td></tr>
         </table>
+        <div id="lagrange-note" class="insight-note"></div>
       </div>
 
       <div class="cp-section" style="font-size:0.72rem; color: var(--n5); line-height:1.6;">

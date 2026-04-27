@@ -9,6 +9,8 @@ const trueValEl   = document.getElementById('true-val');
 const approxValEl = document.getElementById('approx-val');
 const absErrEl    = document.getElementById('abs-err');
 const relErrEl    = document.getElementById('rel-err');
+const lagrangeBoundEl = document.getElementById('lagrange-bound');
+const lagrangeNoteEl = document.getElementById('lagrange-note');
 const xEvalSlider = document.getElementById('x-eval');
 const xEvalLabel  = document.getElementById('x-eval-label');
 const snapXEvalBtn = document.getElementById('snap-xeval');
@@ -104,6 +106,43 @@ function evalPoly(coeffs, a, x) {
   return result;
 }
 
+function getLagrangeBound(funcKey, a, order, x) {
+  const dx = Math.abs(x - a);
+  const nextOrder = order + 1;
+  if (dx === 0) return 0;
+
+  switch (funcKey) {
+    case 'exp': {
+      const maxExp = Math.exp(Math.max(a, x));
+      return maxExp * Math.pow(dx, nextOrder) / factorial(nextOrder);
+    }
+    case 'cos':
+    case 'sin':
+      return Math.pow(dx, nextOrder) / factorial(nextOrder);
+    case 'ln': {
+      const minX = Math.min(a, x);
+      if (minX <= -1) return NaN;
+      return Math.pow(dx, nextOrder) / (nextOrder * Math.pow(1 + minX, nextOrder));
+    }
+    default:
+      return NaN;
+  }
+}
+
+function getLagrangeNote(funcKey) {
+  switch (funcKey) {
+    case 'exp':
+      return 'M_{N+1} = e^{\\max(a, x)}';
+    case 'cos':
+    case 'sin':
+      return 'M_{N+1} = 1';
+    case 'ln':
+      return 'M_{N+1} = \\dfrac{N!}{(1 + \\min(a, x))^{N+1}}';
+    default:
+      return 'M_{N+1}';
+  }
+}
+
 // ─── Viewport ────────────────────────────────────────────────────────────────
 const dpr = () => window.devicePixelRatio || 1;
 
@@ -151,6 +190,20 @@ function setViewFromZoom(zoom, centerX = 0, centerY = 0) {
 function syncZoomUI() {
   zoomSlider.value = state.zoom.toFixed(2);
   zoomLabel.textContent = `${state.zoom.toFixed(2)}×`;
+}
+
+function updateLagrangeNote() {
+  const latex = getLagrangeNote(state.funcKey);
+  if (window.katex) {
+    try {
+      lagrangeNoteEl.innerHTML = `<strong>Lagrange bound uses</strong><div>${window.katex.renderToString(latex, {
+        throwOnError: false,
+        displayMode: true,
+      })}</div>`;
+      return;
+    } catch { /* fall through */ }
+  }
+  lagrangeNoteEl.innerHTML = `<strong>Lagrange bound uses</strong><div>${latex}</div>`;
 }
 
 function setXEval(x) {
@@ -459,6 +512,7 @@ function updateFormula() {
     formulaEl.textContent = compactLatex;
     formulaHoverEl.textContent = fullLatex;
   }
+  updateLagrangeNote();
 }
 
 async function copyFormulaToClipboard() {
@@ -485,18 +539,20 @@ function updateStats() {
 
   if (!fn.domain(xEval)) {
     trueValEl.textContent = 'undefined';
-    approxValEl.textContent = relErrEl.textContent = absErrEl.textContent = '—';
+    approxValEl.textContent = relErrEl.textContent = absErrEl.textContent = lagrangeBoundEl.textContent = '—';
     return;
   }
   const trueVal   = fn.f(xEval);
   const approxVal = evalPoly(getCoeffs(funcKey, a, order), a, xEval);
   const absErr    = Math.abs(trueVal - approxVal);
   const relErr    = Math.abs(trueVal) > 1e-10 ? (absErr / Math.abs(trueVal)) * 100 : NaN;
+  const lagrangeBound = getLagrangeBound(funcKey, a, order, xEval);
 
   trueValEl.textContent   = isFinite(trueVal)   ? trueVal.toFixed(6)   : '±∞';
   approxValEl.textContent = isFinite(approxVal) ? approxVal.toFixed(6) : '±∞';
   absErrEl.textContent    = isFinite(absErr)     ? absErr.toExponential(3) : '—';
   relErrEl.textContent    = isFinite(relErr)     ? relErr.toFixed(3) + ' %' : '—';
+  lagrangeBoundEl.textContent = isFinite(lagrangeBound) ? lagrangeBound.toExponential(3) : '—';
 }
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
@@ -673,6 +729,15 @@ const MODAL = {
       <p>$$|R_N(x)| \\leq \\frac{M_{N+1}}{(N+1)!}|x-a|^{N+1}, \\quad M_{N+1} = \\max_{\\xi}|f^{(N+1)}(\\xi)|$$</p>
       <p>Here, $R_N(x) = f(x) - P_N(x)$ is the part left over after truncating the Taylor series at order $N$.</p>
       <p>It is not the polynomial itself; it is the <strong>remaining error term</strong>. The formula above tells you how large that leftover can be, using a bound on the next derivative.</p>
+      <p><strong>Reading the formula:</strong></p>
+      <p>$$|R_N(x)| \\leq \\frac{M_{N+1}}{(N+1)!}|x-a|^{N+1}$$</p>
+      <p>Three variables control the size of the error:</p>
+      <ul>
+        <li><strong>Distance</strong> $|x-a|$: the farther you move away from the expansion center $a$, the faster the error usually grows. This is why Taylor approximations are strongest near the center.</li>
+        <li><strong>Order</strong> $(N+1)!$: factorial growth is very fast. Increasing the Taylor order makes the denominator much larger, which usually pushes the error bound down.</li>
+        <li><strong>Oscillation</strong> $M_{N+1}$: this is the largest value of the $(N+1)$-th derivative on the interval. If the function bends or changes rapidly there, the error can be larger.</li>
+      </ul>
+      <p><strong>Intuition:</strong> you can think of $M_{N+1}$ as the function's "top speed" at the next derivative level. If $M_{N+1}$ is small, the function stays smooth and the Taylor polynomial predicts well. If $M_{N+1}$ is large, a sharp higher-order turn can make the approximation distort more easily.</p>
       <p>The panel also reports <strong>relative error</strong>:</p>
       <p>$$\\text{rel. error} = \\frac{|f(x)-P_N(x)|}{|f(x)|} \\times 100\\%$$</p>
       <p>It measures how large the approximation error is compared with the true value itself. If $f(x)$ is extremely close to $0$, the ratio becomes unstable, so the UI hides it.</p>
@@ -715,6 +780,15 @@ function evalPoly(coeffs, a, x) {
       <p>$$|R_N(x)| \\leq \\frac{M_{N+1}}{(N+1)!}|x-a|^{N+1}, \\quad M_{N+1} = \\max_{\\xi}|f^{(N+1)}(\\xi)|$$</p>
       <p>其中 $R_N(x) = f(x) - P_N(x)$，表示把泰勒級數截到第 $N$ 階之後，還剩下多少沒有被多項式捕捉到。</p>
       <p>它不是泰勒多項式本身，而是<strong>剩餘的誤差項</strong>。上面的公式不是直接算出誤差，而是用下一階導數的大小去估計這個誤差最多有多大。</p>
+      <p><strong>公式拆解：</strong></p>
+      <p>$$|R_N(x)| \\leq \\frac{M_{N+1}}{(N+1)!}|x-a|^{N+1}$$</p>
+      <p>這裡有三個決定誤差大小的關鍵變數：</p>
+      <ul>
+        <li><strong>距離</strong> $|x-a|$：你離展開點 $a$ 越遠，誤差通常就會很快放大。這也是為什麼泰勒展開在中心點附近最準。</li>
+        <li><strong>階數</strong> $(N+1)!$：分母的階乘成長非常快。當你提高展開階數時，分母會迅速變大，通常會把誤差上界壓低。</li>
+        <li><strong>震盪程度</strong> $M_{N+1}$：它是該區間上第 $(N+1)$ 階導函數的最大值。如果函數在那裡變化很劇烈，誤差就可能更大。</li>
+      </ul>
+      <p><strong>直觀理解：</strong>你可以把 $M_{N+1}$ 想成函數在「下一階的最高時速」。如果 $M_{N+1}$ 很小，代表函數走勢平穩，泰勒多項式會比較準；如果 $M_{N+1}$ 很大，代表高階變化突然變強，近似就更容易失真。</p>
       <p>右側面板還會顯示 <strong>相對誤差</strong>：</p>
       <p>$$\\text{rel. error} = \\frac{|f(x)-P_N(x)|}{|f(x)|} \\times 100\\%$$</p>
       <p>它表示誤差相對於真值本身有多大。當 $f(x)$ 非常接近 $0$ 時，比例會變得不穩定，所以介面會把它隱藏成不可用。</p>
