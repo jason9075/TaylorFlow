@@ -9,11 +9,18 @@ const absErrEl    = document.getElementById('abs-err');
 const relErrEl    = document.getElementById('rel-err');
 const xEvalSlider = document.getElementById('x-eval');
 const xEvalLabel  = document.getElementById('x-eval-label');
+const snapXEvalBtn = document.getElementById('snap-xeval');
+const zoomSlider  = document.getElementById('zoom-slider');
+const zoomLabel   = document.getElementById('zoom-label');
+const resetStateBtn = document.getElementById('reset-state');
 const openMathBtn = document.getElementById('open-math');
 const closeMathBtn= document.getElementById('close-math');
 const langToggle  = document.getElementById('lang-toggle');
 const mathModal   = document.getElementById('math-modal');
 const mathContent = document.getElementById('math-content');
+
+const DEFAULT_VIEW = { left: -7, right: 7, top: 4.5, bottom: -4.5 };
+const ZOOM_RANGE = { min: 0.55, max: 2.4 };
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const state = {
@@ -22,7 +29,8 @@ const state = {
   prevOrder: 0,
   a: 0,
   xEval: 1.5,
-  view: { left: -7, right: 7, top: 4.5, bottom: -4.5 },
+  zoom: 1,
+  view: { ...DEFAULT_VIEW },
   anim: { active: false, t: 1, startTime: 0, duration: 600 },
   drag: { active: false },
   modal: { lang: 'en' },
@@ -118,6 +126,42 @@ function resize() {
   canvas.height = rect.height * dpr();
   canvas.style.width  = rect.width  + 'px';
   canvas.style.height = rect.height + 'px';
+}
+
+function clampZoom(zoom) {
+  return Math.max(ZOOM_RANGE.min, Math.min(ZOOM_RANGE.max, zoom));
+}
+
+function setViewFromZoom(zoom, centerX = 0, centerY = 0) {
+  const nextZoom = clampZoom(zoom);
+  const halfWidth = (DEFAULT_VIEW.right - DEFAULT_VIEW.left) / (2 * nextZoom);
+  const halfHeight = (DEFAULT_VIEW.top - DEFAULT_VIEW.bottom) / (2 * nextZoom);
+  state.zoom = nextZoom;
+  state.view = {
+    left: centerX - halfWidth,
+    right: centerX + halfWidth,
+    top: centerY + halfHeight,
+    bottom: centerY - halfHeight,
+  };
+}
+
+function syncZoomUI() {
+  zoomSlider.value = state.zoom.toFixed(2);
+  zoomLabel.textContent = `${state.zoom.toFixed(2)}×`;
+}
+
+function setXEval(x) {
+  state.xEval = x;
+  xEvalSlider.value = x.toFixed(2);
+}
+
+function resetInteractiveState() {
+  state.a = 0;
+  setXEval(state.a);
+  state.anim.active = false;
+  state.anim.t = 1;
+  updateFormula();
+  updateStats();
 }
 
 // ─── Draw helpers ─────────────────────────────────────────────────────────────
@@ -471,8 +515,24 @@ document.querySelectorAll('.order-btn').forEach(btn => {
 });
 
 xEvalSlider.addEventListener('input', () => {
-  state.xEval = parseFloat(xEvalSlider.value);
+  setXEval(parseFloat(xEvalSlider.value));
   updateStats();
+});
+
+snapXEvalBtn.addEventListener('click', () => {
+  setXEval(state.a);
+  updateStats();
+});
+
+zoomSlider.addEventListener('input', () => {
+  const centerX = (state.view.left + state.view.right) / 2;
+  const centerY = (state.view.top + state.view.bottom) / 2;
+  setViewFromZoom(parseFloat(zoomSlider.value), centerX, centerY);
+  syncZoomUI();
+});
+
+resetStateBtn.addEventListener('click', () => {
+  resetInteractiveState();
 });
 
 // Drag expansion point
@@ -521,25 +581,11 @@ canvas.addEventListener('wheel', e => {
   const rect = canvas.getBoundingClientRect();
   const d = dpr();
   const [mx, my] = canvasToWorld((e.clientX - rect.left) * d, (e.clientY - rect.top) * d);
-  const f = e.deltaY > 0 ? 1.12 : 0.88;
-  const v = state.view;
-  state.view = {
-    left:   mx + (v.left   - mx) * f,
-    right:  mx + (v.right  - mx) * f,
-    top:    my + (v.top    - my) * f,
-    bottom: my + (v.bottom - my) * f,
-  };
+  const factor = e.deltaY > 0 ? 1 / 1.12 : 1.12;
+  const nextZoom = state.zoom * factor;
+  setViewFromZoom(nextZoom, mx, my);
+  syncZoomUI();
 }, { passive: false });
-
-document.getElementById('zoom-origin').addEventListener('click', () => {
-  const a = state.a;
-  const r = 2;
-  state.view = { left: a - r, right: a + r, top: r, bottom: -r };
-});
-
-document.getElementById('zoom-reset').addEventListener('click', () => {
-  state.view = { left: -7, right: 7, top: 4.5, bottom: -4.5 };
-});
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 const MODAL = {
@@ -606,6 +652,7 @@ langToggle.addEventListener('click', () => {
 window.addEventListener('resize', resize);
 resize();
 updateOrderButtons();
+syncZoomUI();
 
 const waitKatex = () => {
   if (window.katex) { updateFormula(); updateStats(); }
