@@ -5,7 +5,7 @@ default:
 
 dev:
     @echo "\033[36m[TaylorFlow] Starting dev server on :8080...\033[0m"
-    live-server --port=8080 --no-browser .
+    live-server --port=8080 .
 
 refresh:
     @echo "\033[34m[TaylorFlow] Refreshing...\033[0m"
