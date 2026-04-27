@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaylorFlow — Taylor Series Visualiser</title>
+
+  <!-- KaTeX -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+          onload="renderMathInElement(document.body, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false}
+            ]
+          });"></script>
+
+  <!-- Prism.js Nord theme -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prism-themes@1.9.0/themes/prism-nord.css" />
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"></script>
+
+  <style>
+    :root {
+      --n0:  #2E3440; --n1:  #3B4252; --n2:  #434C5E; --n3:  #4C566A;
+      --n4:  #D8DEE9; --n5:  #E5E9F0; --n6:  #ECEFF4;
+      --n7:  #8FBCBB; --n8:  #88C0D0; --n9:  #81A1C1; --n10: #5E81AC;
+      --n11: #BF616A; --n12: #D08770; --n13: #EBCB8B;
+      --n14: #A3BE8C; --n15: #B48EAD;
+      --toolbar-h: 52px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--n0);
+      color: var(--n4);
+      font-family: 'JetBrains Mono', 'Cascadia Code', monospace, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      height: var(--toolbar-h);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0 1rem;
+      background: var(--n1);
+      border-bottom: 1px solid var(--n2);
+      z-index: 20;
+    }
+
+    #toolbar .title {
+      font-size: 0.9rem;
+      color: var(--n8);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin-right: auto;
+    }
+
+    #toolbar button {
+      font: inherit;
+      font-size: 0.78rem;
+      border: 1px solid var(--n3);
+      border-radius: 999px;
+      background: var(--n2);
+      color: var(--n5);
+      padding: 0.3rem 0.75rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #toolbar button:hover { background: var(--n3); }
+
+    #open-math {
+      font-size: 1.1rem;
+      padding: 0.3rem 0.6rem;
+    }
+
+    /* ── Main layout ── */
+    #layout {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    /* ── Canvas panel ── */
+    #canvas-panel {
+      flex: 1;
+      position: relative;
+      min-width: 0;
+      background: var(--n0);
+    }
+
+    #canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    /* ── Control panel ── */
+    #control-panel {
+      width: 300px;
+      flex-shrink: 0;
+      background: var(--n1);
+      border-left: 1px solid var(--n2);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .cp-section {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--n2);
+    }
+
+    .cp-label {
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--n9);
+      margin-bottom: 0.5rem;
+    }
+
+    /* Function selector */
+    #func-select {
+      width: 100%;
+      font: inherit;
+      font-size: 0.85rem;
+      background: var(--n2);
+      color: var(--n5);
+      border: 1px solid var(--n3);
+      border-radius: 6px;
+      padding: 0.4rem 0.6rem;
+      cursor: pointer;
+    }
+
+    /* Order stepper */
+    #order-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 4px;
+    }
+
+    .order-btn {
+      font: inherit;
+      font-size: 0.78rem;
+      background: var(--n2);
+      color: var(--n4);
+      border: 1px solid var(--n3);
+      border-radius: 5px;
+      padding: 0.35rem 0;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .order-btn:hover { background: var(--n3); }
+
+    .order-btn.active {
+      background: var(--n10);
+      color: var(--n6);
+      border-color: var(--n9);
+    }
+
+    /* Formula display */
+    #formula-display {
+      min-height: 3rem;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      color: var(--n5);
+      padding: 0.25rem 0;
+    }
+
+    /* x-eval slider */
+    #x-eval-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    #x-eval {
+      flex: 1;
+      accent-color: var(--n9);
+    }
+
+    #x-eval-label {
+      min-width: 3rem;
+      text-align: right;
+      font-size: 0.82rem;
+      color: var(--n13);
+    }
+
+    /* Stats table */
+    .stats-table {
+      width: 100%;
+      font-size: 0.8rem;
+      border-collapse: collapse;
+    }
+
+    .stats-table td {
+      padding: 0.3rem 0.4rem;
+      border-bottom: 1px solid var(--n2);
+    }
+
+    .stats-table td:first-child {
+      color: var(--n9);
+      white-space: nowrap;
+    }
+
+    .stats-table td:last-child {
+      text-align: right;
+      color: var(--n5);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-error { color: var(--n11) !important; }
+
+    /* ── Modal ── */
+    #math-modal[hidden] { display: none; }
+
+    #math-modal {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(46, 52, 64, 0.82);
+      z-index: 50;
+    }
+
+    .modal-panel {
+      width: min(680px, calc(100vw - 2rem));
+      max-height: calc(100vh - 2rem);
+      overflow-y: auto;
+      background: var(--n1);
+      border: 1px solid var(--n3);
+      border-radius: 16px;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+      padding: 1.25rem;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .modal-header h2 {
+      font-size: 0.9rem;
+      color: var(--n8);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .modal-actions button {
+      font: inherit;
+      font-size: 0.75rem;
+      border: 1px solid var(--n3);
+      border-radius: 999px;
+      background: var(--n2);
+      color: var(--n5);
+      padding: 0.3rem 0.7rem;
+      cursor: pointer;
+    }
+
+    .modal-actions button:hover { background: var(--n3); }
+
+    #math-content {
+      line-height: 1.8;
+      color: var(--n5);
+      font-size: 0.85rem;
+      display: grid;
+      gap: 0.6rem;
+    }
+
+    #math-content h3 {
+      color: var(--n8);
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+    }
+
+    #math-content .katex-display {
+      margin: 0.25rem 0;
+    }
+
+    #math-content pre[class*="language-"] {
+      border-radius: 8px;
+      font-size: 0.78rem;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="toolbar">
+    <span class="title">TaylorFlow</span>
+    <button id="zoom-origin" title="Zoom to expansion point">Zoom In</button>
+    <button id="zoom-reset" title="Reset viewport">Reset View</button>
+    <button id="open-math" title="Explain the math" aria-haspopup="dialog">💡</button>
+  </div>
+
+  <div id="layout">
+    <div id="canvas-panel">
+      <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="control-panel">
+
+      <div class="cp-section">
+        <div class="cp-label">Function</div>
+        <select id="func-select">
+          <option value="exp">eˣ</option>
+          <option value="cos">cos x</option>
+          <option value="sin">sin x</option>
+          <option value="ln">ln(1 + x)</option>
+        </select>
+      </div>
+
+      <div class="cp-section">
+        <div class="cp-label">Taylor Order</div>
+        <div id="order-grid">
+          <button class="order-btn" data-order="0">0</button>
+          <button class="order-btn" data-order="1">1</button>
+          <button class="order-btn" data-order="2">2</button>
+          <button class="order-btn" data-order="3">3</button>
+          <button class="order-btn" data-order="4">4</button>
+          <button class="order-btn" data-order="5">5</button>
+          <button class="order-btn" data-order="6">6</button>
+          <button class="order-btn" data-order="7">7</button>
+          <button class="order-btn" data-order="8">8</button>
+          <button class="order-btn" data-order="9">9</button>
+          <button class="order-btn" data-order="10">10</button>
+          <button class="order-btn" data-order="12">12</button>
+        </div>
+      </div>
+
+      <div class="cp-section">
+        <div class="cp-label">Live Formula</div>
+        <div id="formula-display"></div>
+      </div>
+
+      <div class="cp-section">
+        <div class="cp-label">Evaluate at x =</div>
+        <div id="x-eval-row">
+          <input type="range" id="x-eval" min="-5" max="5" step="0.05" value="1.5" />
+          <span id="x-eval-label">1.50</span>
+        </div>
+      </div>
+
+      <div class="cp-section">
+        <div class="cp-label">Numerical Insights</div>
+        <table class="stats-table">
+          <tr><td>f(x)</td><td id="true-val">—</td></tr>
+          <tr><td>P<sub>N</sub>(x)</td><td id="approx-val">—</td></tr>
+          <tr><td>|error|</td><td id="abs-err" class="stat-error">—</td></tr>
+          <tr><td>rel. error</td><td id="rel-err" class="stat-error">—</td></tr>
+        </table>
+      </div>
+
+      <div class="cp-section" style="font-size:0.72rem; color: var(--n3); line-height:1.6;">
+        Drag the <span style="color:var(--n12)">●</span> point to move the expansion center.<br>
+        Scroll on the canvas to zoom.
+      </div>
+
+    </div>
+  </div>
+
+  <div id="math-modal" role="dialog" aria-modal="true" aria-labelledby="math-title" hidden>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h2 id="math-title">Math Behind the Scene</h2>
+        <div class="modal-actions">
+          <button id="lang-toggle">Eng / 中</button>
+          <button id="close-math">Close</button>
+        </div>
+      </div>
+      <div id="math-content"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
