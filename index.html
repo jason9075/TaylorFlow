@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TaylorFlow — Taylor Series Visualiser</title>
+  <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🧮</text></svg>' />
 
   <!-- KaTeX -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
@@ -49,19 +50,24 @@
       flex-shrink: 0;
       display: flex;
       align-items: center;
+      justify-content: flex-end;
       gap: 0.6rem;
       padding: 0 1rem;
       background: var(--n1);
       border-bottom: 1px solid var(--n2);
       z-index: 20;
+      position: relative;
     }
 
     #toolbar .title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
       font-size: 0.9rem;
       color: var(--n8);
       font-weight: 600;
       letter-spacing: 0.04em;
-      margin-right: auto;
+      pointer-events: none;
     }
 
     #toolbar button {
@@ -300,9 +306,34 @@
       font-size: 0.78rem;
       margin: 0;
     }
+
+    .github-ribbon {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 60;
+      line-height: 0;
+    }
+
+    .github-ribbon img {
+      display: block;
+      width: 149px;
+      height: 149px;
+      border: 0;
+    }
+
+    @media (max-width: 640px) {
+      .github-ribbon img {
+        width: 112px;
+        height: 112px;
+      }
+    }
   </style>
 </head>
 <body>
+  <a class="github-ribbon" href="https://github.com/jason9075/TaylorFlow" aria-label="Fork me on GitHub">
+    <img loading="lazy" decoding="async" width="149" height="149" src="https://github.blog/wp-content/uploads/2008/12/forkme_left_orange_ff7600.png" alt="Fork me on GitHub">
+  </a>
 
   <div id="toolbar">
     <span class="title">TaylorFlow</span>
